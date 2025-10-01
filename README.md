@@ -44,6 +44,7 @@ Client → Pushpin (port 7999) → Origin API (port 3000)
 
 - **Stack**: Bun + TypeScript
 - Demonstrates subscribing to a topic and publishing messages
+- Usage: `bun run index.ts [topic-name]` (defaults to "test-topic")
 
 ## Setup
 
@@ -72,10 +73,10 @@ docker-compose up --build
 # In another terminal, run the client
 cd client
 bun install
-bun run index.ts
+bun run index.ts [topic-name]
 ```
 
-### Running Locally (Development)
+### Running Seperately
 
 ```bash
 # Terminal 1: Origin API
@@ -85,7 +86,7 @@ bun run index.ts
 
 # Terminal 2: Pubsub Service
 cd pubsub-service
-npm install
+bun install
 npx tsx index.ts
 
 # Terminal 3: Pushpin (via Docker)
@@ -132,12 +133,26 @@ cd origin-api && bun install
 cd client && bun install
 
 # Pubsub Service (Node.js)
-cd pubsub-service && npm install
+cd pubsub-service && bun install
 ```
 
 ### Testing
 
 The client example demonstrates the full flow - it subscribes to a topic, then publishes 5 messages with 1-second intervals.
+
+Run with a custom topic:
+
+```bash
+cd client
+bun run index.ts my-custom-topic
+```
+
+Or use the default topic:
+
+```bash
+cd client
+bun run index.ts
+```
 
 ## Ports
 

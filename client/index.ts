@@ -1,5 +1,6 @@
 const PUSHPIN_URL = process.env.PUSHPIN_URL || "http://localhost:7999";
-const TOPIC = process.env.TOPIC || "test-topic";
+// Get topic from command line args, env var, or default
+const TOPIC = process.argv[2] || process.env.TOPIC || "test-topic";
 
 async function subscribe(topic: string) {
   console.log(`\n📡 Subscribing to topic: ${topic}`);
@@ -61,7 +62,8 @@ async function publish(topic: string, message: string) {
 async function main() {
   console.log("🚀 Pushpin + S2 Client Demo");
   console.log(`Using Pushpin at: ${PUSHPIN_URL}`);
-  console.log(`Topic: ${TOPIC}\n`);
+  console.log(`Topic: ${TOPIC}`);
+  console.log(`Usage: bun run index.ts [topic-name]\n`);
 
   // Start subscription in background
   const subscriptionPromise = subscribe(TOPIC);
