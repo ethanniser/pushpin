@@ -1,12 +1,12 @@
 services:
   pushpin:
-    image: fanout/pushpin:latest
+    build:
+      context: ./pushpin
+      dockerfile: Dockerfile
     ports:
       - "7999:7999"  # HTTP port
       - "5560:5560"  # Stats port (SUB)
       - "5563:5563"  # Publish port (PULL)
-    volumes:
-      - ./pushpin/routes:/etc/pushpin/routes
     depends_on:
       - origin-api
 
