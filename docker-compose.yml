@@ -34,6 +34,17 @@ services:
     depends_on:
       - pushpin
 
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"  # Client dev server
+    environment:
+      - PUSHPIN_URL=http://pushpin:7999
+    depends_on:
+      - pushpin
+
 networks:
   default:
     name: pushpin-network
