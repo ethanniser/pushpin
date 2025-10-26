@@ -5,9 +5,9 @@ import {
   Link,
   useLocation,
 } from "react-router-dom";
-import { Home } from "./pages/Home.js";
-import { Stream } from "./pages/Stream.js";
-import { Chat } from "./pages/Chat.js";
+import { Home } from "./pages/Home";
+import { Stream } from "./pages/Stream";
+import { Chat } from "./pages/Chat";
 
 function NavBar() {
   const location = useLocation();

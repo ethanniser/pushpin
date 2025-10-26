@@ -6,12 +6,12 @@ WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
 
-# Copy source code and public files
+# Copy source code
 COPY . .
 
-# Expose the dev server port
+# Expose the Vite dev server port
 EXPOSE 8080
 
-# Run the Bun dev server
-CMD ["bun", "run", "src/server.tsx"]
+# Run the Vite dev server
+CMD ["bun", "run", "dev"]
 
