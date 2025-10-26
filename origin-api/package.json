@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@s2-dev/streamstore": "^0.15.13"
+    "@s2-dev/streamstore": "^0.15.13",
+    "ioredis": "^5.4.1"
   },
   "devDependencies": {
     "@types/bun": "latest"

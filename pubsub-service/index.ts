@@ -11,6 +11,8 @@ const PUSHPIN_PUBLISH_URI =
 
 // Track active subscriptions: topic -> S2 stream subscription
 const activeSubscriptions = new Map<string, AbortController>();
+// Track subscriber counts: topic -> number of active subscribers
+const subscriberCounts = new Map<string, number>();
 
 // Initialize S2 client
 const s2 = new S2({
@@ -32,12 +34,16 @@ console.log(`📤 Connected to Pushpin publish at ${PUSHPIN_PUBLISH_URI}`);
 
 // Subscribe to S2 stream and forward messages to Pushpin
 async function subscribeToS2Stream(topic: string) {
+  // Increment subscriber count
+  const currentCount = subscriberCounts.get(topic) || 0;
+  subscriberCounts.set(topic, currentCount + 1);
+  
   if (activeSubscriptions.has(topic)) {
-    console.log(`[S2] Already subscribed to stream: ${topic}`);
+    console.log(`[S2] Already subscribed to stream: ${topic} (subscribers: ${currentCount + 1})`);
     return;
   }
 
-  console.log(`[S2] Subscribing to stream: ${topic}`);
+  console.log(`[S2] Subscribing to stream: ${topic} (subscribers: 1)`);
 
   const abortController = new AbortController();
   activeSubscriptions.set(topic, abortController);
@@ -83,6 +89,11 @@ async function subscribeToS2Stream(topic: string) {
       // Short delay before polling again
       await new Promise((resolve) => setTimeout(resolve, 100));
     } catch (readError) {
+      // AbortError is expected when we intentionally unsubscribe
+      if (readError instanceof Error && readError.name === 'AbortError') {
+        console.log(`[S2] Stream subscription gracefully closed: ${topic}`);
+        return;
+      }
       console.error(`[S2] Error reading stream ${topic}:`, readError);
       // Wait a bit longer on error before retrying
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -90,16 +101,40 @@ async function subscribeToS2Stream(topic: string) {
   } catch (error) {
     console.error(`[S2] Error subscribing to stream ${topic}:`, error);
     activeSubscriptions.delete(topic);
+    // Decrement subscriber count on error
+    const currentCount = subscriberCounts.get(topic) || 0;
+    if (currentCount > 0) {
+      subscriberCounts.set(topic, currentCount - 1);
+      if (currentCount - 1 === 0) {
+        subscriberCounts.delete(topic);
+      }
+    }
   }
 }
 
 // Unsubscribe from S2 stream
 function unsubscribeFromS2Stream(topic: string) {
-  const controller = activeSubscriptions.get(topic);
-  if (controller) {
-    console.log(`[S2] Unsubscribing from stream: ${topic}`);
-    controller.abort();
-    activeSubscriptions.delete(topic);
+  // Decrement subscriber count
+  const currentCount = subscriberCounts.get(topic) || 0;
+  if (currentCount <= 0) {
+    console.log(`[S2] Warning: Unsubscribe called but no subscribers for: ${topic}`);
+    return;
+  }
+  
+  const newCount = currentCount - 1;
+  subscriberCounts.set(topic, newCount);
+  
+  console.log(`[S2] Unsubscribe from ${topic} (remaining subscribers: ${newCount})`);
+  
+  // Only unsubscribe from S2 when no subscribers remain
+  if (newCount === 0) {
+    const controller = activeSubscriptions.get(topic);
+    if (controller) {
+      console.log(`[S2] No more subscribers, unsubscribing from S2 stream: ${topic}`);
+      controller.abort();
+      activeSubscriptions.delete(topic);
+      subscriberCounts.delete(topic);
+    }
   }
 }
 
@@ -125,12 +160,15 @@ async function listenToStats() {
           // Handle subscription events
           if (messageType === "sub") {
             const channel = payload.channel;
-            console.log(`[Stats] ✅ New subscription: ${channel}`);
-            subscribeToS2Stream(channel);
-          } else if (messageType === "unsub") {
-            const channel = payload.channel;
-            console.log(`[Stats] ❌ Unsubscribe: ${channel}`);
-            unsubscribeFromS2Stream(channel);
+            
+            // Check if this is an unsubscribe (unavailable: true)
+            if (payload.unavailable === true) {
+              console.log(`[Stats] ❌ Unsubscribe: ${channel}`);
+              unsubscribeFromS2Stream(channel);
+            } else {
+              console.log(`[Stats] ✅ New subscription: ${channel}`);
+              subscribeToS2Stream(channel);
+            }
           }
         }
       }

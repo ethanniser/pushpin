@@ -1,6 +1,6 @@
-# Pushpin Demo Client
+# Serverless SSE/WebSockets Demo Client
 
-A modern React-based client demonstrating Pushpin's real-time capabilities using Server-Sent Events (SSE) and WebSockets.
+A modern React-based client demonstrating stateless real-time messaging using Server-Sent Events (SSE) and WebSockets, designed for serverless deployment.
 
 ## Features
 
@@ -16,7 +16,7 @@ A modern React-based client demonstrating Pushpin's real-time capabilities using
 - **React 18** - UI framework with hooks
 - **React Router 6** - Client-side routing
 - **Tailwind CSS** - Utility-first styling
-- **Pushpin** - Real-time proxy server
+- **Pushpin** - Stateless real-time proxy (implementation detail)
 
 ## Quick Start
 
@@ -40,13 +40,13 @@ The app will be available at [http://localhost:8080](http://localhost:8080)
 1. **Build the Docker image:**
 
    ```bash
-   docker build -t pushpin-client .
+   docker build -t sse-ws-demo-client .
    ```
 
 2. **Run the container:**
 
    ```bash
-   docker run -p 8080:8080 -e PUSHPIN_URL=http://localhost:7999 pushpin-client
+   docker run -p 8080:8080 -e PUSHPIN_URL=http://localhost:7999 sse-ws-demo-client
    ```
 
 3. **Or use Docker Compose (from project root):**
@@ -59,8 +59,8 @@ The app will be available at [http://localhost:8080](http://localhost:8080)
 For production, use the optimized Dockerfile:
 
 ```bash
-docker build -f Dockerfile.production -t pushpin-client:prod .
-docker run -p 8080:8080 pushpin-client:prod
+docker build -f Dockerfile.production -t sse-ws-demo-client:prod .
+docker run -p 8080:8080 sse-ws-demo-client:prod
 ```
 
 Or build with Bun:
@@ -177,34 +177,36 @@ This outputs optimized bundles to `dist/`.
 
 ## Architecture
 
-The client communicates with Pushpin, which proxies requests to the origin-api:
+The client demonstrates stateless real-time connections suitable for serverless deployment:
 
 ```
 Client (Browser)
     ↓
     ↓ HTTP/WebSocket
     ↓
-Pushpin (Proxy)
+Stateless Proxy (Pushpin)
     ↓
     ↓ GRIP Protocol
     ↓
-Origin API (Backend)
+Serverless Origin API
 ```
 
 ### SSE Flow
 
 1. Client connects to `/subscribe/:topic` via SSE
-2. Pushpin holds the connection with GRIP headers
-3. Origin API subscribes to the topic
+2. Stateless proxy holds the connection using GRIP
+3. Origin API (stateless) subscribes to the topic
 4. Messages published to the topic are streamed to clients
+5. Origin can scale independently without managing connections
 
 ### WebSocket Flow
 
 1. Client connects to `/socket` via WebSocket
-2. Pushpin uses WebSocket-over-HTTP protocol to origin
-3. Origin API manages chat rooms and subscriptions
+2. Proxy uses WebSocket-over-HTTP protocol to origin
+3. Origin API (stateless) manages chat rooms via pub/sub
 4. Messages are published to room channels
-5. Pushpin broadcasts to all subscribers in the room
+5. Proxy broadcasts to all subscribers in the room
+6. Origin instances can scale without connection state
 
 ## Development Tips
 
@@ -226,9 +228,9 @@ const server = serve({
 });
 ```
 
-### Pushpin Not Running
+### Proxy Not Running
 
-Make sure Pushpin is running on port 7999:
+Make sure the proxy server is running on port 7999:
 
 ```bash
 docker-compose up pushpin
@@ -246,6 +248,7 @@ bun install
 ## Learn More
 
 - [Bun Documentation](https://bun.sh/docs)
-- [Pushpin Documentation](https://pushpin.org/docs/)
+- [GRIP Protocol](https://pushpin.org/docs/protocols/grip/) - Stateless real-time protocol
+- [Pushpin Documentation](https://pushpin.org/docs/) - Implementation detail
 - [React Documentation](https://react.dev)
 - [Tailwind CSS](https://tailwindcss.com)

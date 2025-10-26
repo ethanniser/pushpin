@@ -2,6 +2,11 @@
 // This handles the WebSocket connection via Pushpin's WebSocket-over-HTTP protocol
 
 import { S2 } from "@s2-dev/streamstore";
+import {
+  setConnectionState,
+  getConnectionState,
+  deleteConnectionState,
+} from "../redis";
 
 const s2 = new S2({ accessToken: process.env.S2_AUTH_TOKEN! });
 const basin = process.env.S2_BASIN!;
@@ -110,6 +115,9 @@ export const GET = async (req: Request): Promise<Response> => {
           
           console.log(`[Socket] ${username} joining room: ${room}`);
           
+          // Track this connection in Redis (with 1 hour TTL)
+          await setConnectionState(connectionId, username, room, 3600);
+          
           // Send subscription control message
           const subscribeMsg = JSON.stringify({
             type: "subscribe",
@@ -156,6 +164,31 @@ export const GET = async (req: Request): Promise<Response> => {
 
     } else if (event.type === "CLOSE") {
       console.log(`[Socket] CLOSE from ${connectionId}`);
+      
+      // Check if this connection was tracked (user had joined a room)
+      const connectionInfo = await getConnectionState(connectionId);
+      if (connectionInfo) {
+        const { username, room } = connectionInfo;
+        console.log(`[Socket] ${username} leaving room: ${room}`);
+        
+        // Send unsubscribe control message
+        const unsubscribeMsg = JSON.stringify({
+          type: "unsubscribe",
+          channel: `room:${room}`,
+        });
+        responseEvents += encodeWebSocketEvent("TEXT", `c:${unsubscribeMsg}`);
+        
+        // Broadcast leave message to room
+        const leaveMessage = JSON.stringify({
+          type: "system",
+          message: `${username} has left the room`,
+        });
+        await publishToChannel(`room:${room}`, leaveMessage);
+        
+        // Remove from tracking
+        await deleteConnectionState(connectionId);
+      }
+      
       // Acknowledge the close
       const statusCode = Buffer.from([0x03, 0xE8]); // 1000 = normal closure
       responseEvents += `CLOSE 2\r\n${statusCode.toString()}\r\n`;

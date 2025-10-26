@@ -21,8 +21,8 @@ function NavBar() {
   return (
     <nav className="bg-gray-800 shadow-lg w-full flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-2xl">📌</span>
-        <span className="text-xl font-bold text-white">Pushpin Demo</span>
+        <span className="text-2xl">⚡</span>
+        <span className="text-xl font-bold text-white">Serverless SSE/WS</span>
       </div>
       <div className="flex gap-4">
         <Link

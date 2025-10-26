@@ -11,6 +11,14 @@ services:
     depends_on:
       - origin-api
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
   origin-api:
     build:
       context: ./origin-api
@@ -21,6 +29,9 @@ services:
       - PORT=3000
       - S2_AUTH_TOKEN=${S2_AUTH_TOKEN}
       - S2_BASIN=${S2_BASIN}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
 
   pubsub-service:
     build:
@@ -44,6 +55,9 @@ services:
       - PUSHPIN_URL=http://pushpin:7999
     depends_on:
       - pushpin
+
+volumes:
+  redis-data:
 
 networks:
   default:

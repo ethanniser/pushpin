@@ -145,7 +145,7 @@ export function Chat() {
             💬 WebSocket Chat Room
           </h1>
           <p className="text-green-100">
-            Real-time chat powered by WebSockets and Pushpin
+            Real-time bidirectional chat using stateless WebSocket connections
           </p>
         </div>
 

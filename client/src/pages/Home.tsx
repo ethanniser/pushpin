@@ -3,11 +3,11 @@ export function Home() {
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-8">
         <h1 className="text-4xl font-bold text-gray-800 mb-4">
-          Welcome to Pushpin Demo
+          Serverless SSE/WebSockets Demo
         </h1>
         <p className="text-lg text-gray-600 mb-6">
-          This is a demonstration of Pushpin's real-time messaging capabilities
-          using Server-Sent Events (SSE) and WebSockets.
+          A demonstration of stateless real-time messaging using Server-Sent
+          Events (SSE) and WebSockets, designed for serverless deployment.
         </p>
 
         <div className="grid md:grid-cols-2 gap-6 mt-8">
@@ -63,7 +63,8 @@ export function Home() {
               • <strong>Tailwind CSS</strong> - Utility-first styling
             </li>
             <li>
-              • <strong>Pushpin</strong> - Real-time proxy server
+              • <strong>Pushpin</strong> - Stateless real-time proxy
+              (implementation detail)
             </li>
           </ul>
         </div>
