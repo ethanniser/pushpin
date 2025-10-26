@@ -6,6 +6,7 @@ interface Message {
   id: string;
   content: string;
   timestamp: string;
+  direction: "incoming" | "outgoing";
 }
 
 export function Stream() {
@@ -13,89 +14,92 @@ export function Stream() {
   const [topic, setTopic] = useState("demo-stream");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
-    null
-  );
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  const connect = async () => {
+  const connect = () => {
     // Close existing connection if any
-    if (readerRef.current) {
-      readerRef.current.cancel();
-      readerRef.current = null;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
 
     setMessages([]);
     setError(null);
-    setIsConnected(true);
 
     try {
       console.log(`Subscribing to topic: ${topic}`);
-      const response = await fetch(`${PUSHPIN_URL}/subscribe/${topic}`);
+      const eventSource = new EventSource(`${PUSHPIN_URL}/subscribe/${topic}`);
+      eventSourceRef.current = eventSource;
 
-      if (!response.ok) {
-        throw new Error(`Subscribe failed: ${response.statusText}`);
-      }
+      eventSource.onopen = () => {
+        console.log("EventSource connection opened");
+        setIsConnected(true);
+        setError(null);
+      };
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body");
-      }
-
-      readerRef.current = reader;
-      const decoder = new TextDecoder();
-
-      // Read stream
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          console.log("Stream closed");
-          setIsConnected(false);
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        if (chunk.trim()) {
+      eventSource.onmessage = (event) => {
+        console.log("Received message:", event.data);
+        if (event.data.trim()) {
           const message: Message = {
-            id: Date.now().toString(),
-            content: chunk.trim(),
+            id: Date.now().toString() + Math.random(),
+            content: event.data.trim(),
             timestamp: new Date().toLocaleTimeString(),
+            direction: "incoming",
           };
           setMessages((prev) => [...prev, message]);
         }
-      }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("EventSource error:", err);
+        setError("Connection failed or closed");
+        setIsConnected(false);
+        eventSource.close();
+      };
     } catch (err) {
-      console.error("Stream error:", err);
+      console.error("EventSource error:", err);
       setError(err instanceof Error ? err.message : "Connection failed");
       setIsConnected(false);
     }
   };
 
   const disconnect = () => {
-    if (readerRef.current) {
-      readerRef.current.cancel();
-      readerRef.current = null;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     setIsConnected(false);
   };
 
-  const sendTestMessage = async () => {
+  const requestMessage = async () => {
     try {
-      const message = `Test message at ${new Date().toLocaleTimeString()}`;
+      const content = `Request message at ${new Date().toLocaleTimeString()}`;
+
+      // Add outgoing message to UI
+      const outgoingMessage: Message = {
+        id: Date.now().toString() + Math.random(),
+        content,
+        timestamp: new Date().toLocaleTimeString(),
+        direction: "outgoing",
+      };
+      setMessages((prev) => [...prev, outgoingMessage]);
+
+      // Publish to the topic
       await fetch(`${PUSHPIN_URL}/publish/${topic}`, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: message,
+        body: content,
       });
     } catch (err) {
       console.error("Publish error:", err);
+      setError("Failed to send message");
     }
   };
 
   useEffect(() => {
     return () => {
-      if (readerRef.current) {
-        readerRef.current.cancel();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
       }
     };
   }, []);
@@ -139,15 +143,15 @@ export function Stream() {
               <>
                 <button
                   onClick={disconnect}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-6 rounded-md transition-colors"
+                  className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-6 rounded-md transition-colors"
                 >
                   Disconnect
                 </button>
                 <button
-                  onClick={sendTestMessage}
+                  onClick={requestMessage}
                   className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-6 rounded-md transition-colors"
                 >
-                  Send Test Message
+                  Request Message
                 </button>
               </>
             )}
@@ -181,12 +185,46 @@ export function Stream() {
               messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className="bg-blue-50 border border-blue-200 rounded p-3"
+                  className={`flex items-start gap-3 p-3 rounded ${
+                    msg.direction === "outgoing"
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-blue-50 border border-blue-200"
+                  }`}
                 >
-                  <div className="text-xs text-blue-600 font-medium mb-1">
-                    {msg.timestamp}
+                  <div
+                    className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      msg.direction === "outgoing"
+                        ? "bg-green-500 text-white"
+                        : "bg-blue-500 text-white"
+                    }`}
+                  >
+                    {msg.direction === "outgoing" ? "↑" : "↓"}
                   </div>
-                  <div className="text-gray-800">{msg.content}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={`text-xs font-semibold ${
+                          msg.direction === "outgoing"
+                            ? "text-green-700"
+                            : "text-blue-700"
+                        }`}
+                      >
+                        {msg.direction === "outgoing" ? "SENT" : "RECEIVED"}
+                      </span>
+                      <span
+                        className={`text-xs ${
+                          msg.direction === "outgoing"
+                            ? "text-green-600"
+                            : "text-blue-600"
+                        }`}
+                      >
+                        {msg.timestamp}
+                      </span>
+                    </div>
+                    <div className="text-gray-800 break-words font-mono text-sm">
+                      {msg.content}
+                    </div>
+                  </div>
                 </div>
               ))
             )}

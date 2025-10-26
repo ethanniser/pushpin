@@ -19,40 +19,36 @@ function NavBar() {
   };
 
   return (
-    <nav className="bg-gray-800 shadow-lg">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl">📌</span>
-            <span className="text-xl font-bold text-white">Pushpin Demo</span>
-          </div>
-          <div className="flex space-x-4">
-            <Link
-              to="/"
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-                "/"
-              )}`}
-            >
-              Home
-            </Link>
-            <Link
-              to="/stream"
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-                "/stream"
-              )}`}
-            >
-              Stream (SSE)
-            </Link>
-            <Link
-              to="/chat"
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-                "/chat"
-              )}`}
-            >
-              Chat (WS)
-            </Link>
-          </div>
-        </div>
+    <nav className="bg-gray-800 shadow-lg w-full flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">📌</span>
+        <span className="text-xl font-bold text-white">Pushpin Demo</span>
+      </div>
+      <div className="flex gap-4">
+        <Link
+          to="/"
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
+            "/"
+          )}`}
+        >
+          Home
+        </Link>
+        <Link
+          to="/stream"
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
+            "/stream"
+          )}`}
+        >
+          Stream (SSE)
+        </Link>
+        <Link
+          to="/chat"
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
+            "/chat"
+          )}`}
+        >
+          Chat (WS)
+        </Link>
       </div>
     </nav>
   );

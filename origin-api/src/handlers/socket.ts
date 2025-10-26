@@ -1,8 +1,10 @@
 // WebSocket-over-HTTP handler for chat rooms
 // This handles the WebSocket connection via Pushpin's WebSocket-over-HTTP protocol
 
-const PUSHPIN_PUBLISH_URL =
-  process.env.PUSHPIN_PUBLISH_URL || "http://localhost:5561";
+import { S2 } from "@s2-dev/streamstore";
+
+const s2 = new S2({ accessToken: process.env.S2_AUTH_TOKEN! });
+const basin = process.env.S2_BASIN!;
 
 // Parse WebSocket-over-HTTP events from request body
 function parseWebSocketEvents(body: string): Array<{ type: string; content?: string }> {
@@ -51,24 +53,24 @@ function encodeWebSocketEvent(type: string, content?: string): string {
   return `TEXT ${hexLen}\r\n${content}\r\n`;
 }
 
-// Publish a message to a Pushpin channel
+// Publish a message to a Pushpin channel via S2
 async function publishToChannel(channel: string, message: string) {
   try {
-    await fetch(`${PUSHPIN_PUBLISH_URL}/publish/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: [
-          {
-            channel,
-            formats: {
-              "ws-message": {
-                content: message,
-              },
-            },
-          },
-        ],
-      }),
+    // Format message in Pushpin's expected format
+    // pubsub-service will add the "J" prefix when forwarding to Pushpin
+    const pushpinItem = {
+      channel,
+      formats: {
+        "ws-message": {
+          content: message,
+        },
+      },
+    };
+    
+    await s2.records.append({
+      s2Basin: basin,
+      stream: `v1/${channel}`,
+      appendInput: { records: [{ body: JSON.stringify(pushpinItem) }] },
     });
   } catch (error) {
     console.error(`[Socket] Error publishing to channel ${channel}:`, error);

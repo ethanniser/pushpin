@@ -63,26 +63,19 @@ async function subscribeToS2Stream(topic: string) {
         }
 
         if (event.event === "batch") {
-          const body = event.data.records
-            .map((record) => record.body)
-            .join("\n");
+          // Forward each record to Pushpin with "J" prefix
+          // Records contain JSON objects formatted for Pushpin by the publishers
+          for (const record of event.data.records) {
+            const message = record.body;
 
-          if (body) {
-            console.log(`[S2→Pushpin] Topic: ${topic}, Message: ${body}`);
+            if (message) {
+              console.log(`[S2→Pushpin] Topic: ${topic}, Message: ${message}`);
 
-            // Send to Pushpin via ZMQ PULL socket
-            // Format: "J" prefix + single item JSON (not wrapped in "items" array)
-            const item = {
-              channel: topic,
-              formats: {
-                "http-stream": {
-                  content: body + "\n",
-                },
-              },
-            };
-            const pushpinMessage = "J" + JSON.stringify(item);
-
-            await publishSocket.send(pushpinMessage);
+              // Send to Pushpin via ZMQ PULL socket
+              // Add "J" prefix to indicate JSON format
+              const pushpinMessage = "J" + message;
+              await publishSocket.send(pushpinMessage);
+            }
           }
         }
       }
