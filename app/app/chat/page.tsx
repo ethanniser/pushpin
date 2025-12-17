@@ -39,7 +39,7 @@ export default function Chat() {
     try {
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(
-        `${wsProtocol}//${window.location.host}/api/socket`
+        `${wsProtocol}//${window.location.host}/api/socket`,
       );
       wsRef.current = ws;
 
@@ -53,7 +53,7 @@ export default function Chat() {
             type: "join",
             room,
             username: username.trim(),
-          })
+          }),
         );
       };
 
@@ -123,7 +123,7 @@ export default function Chat() {
           room,
           username: username.trim(),
           message: message.trim(),
-        })
+        }),
       );
       setMessage("");
     } catch (err) {
@@ -235,8 +235,8 @@ export default function Chat() {
                             msg.username === "System"
                               ? "bg-gray-200 text-gray-600 text-center w-full"
                               : msg.isOwn
-                              ? "bg-green-500 text-white"
-                              : "bg-white border border-gray-300 text-gray-800"
+                                ? "bg-green-500 text-white"
+                                : "bg-white border border-gray-300 text-gray-800"
                           }`}
                         >
                           <div className="text-xs font-semibold mb-1 opacity-75">

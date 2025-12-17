@@ -11,7 +11,7 @@ const publisher = new Publisher({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ topic: string }> }
+  { params }: { params: Promise<{ topic: string }> },
 ): Promise<Response> {
   const { topic } = await params;
 
@@ -50,7 +50,7 @@ export async function POST(
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
+      },
     );
   } catch (error) {
     console.error("[Publish-v2 ERROR]", error);
@@ -65,7 +65,7 @@ export async function POST(
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
+      },
     );
   }
 }

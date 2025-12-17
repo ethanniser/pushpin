@@ -63,4 +63,3 @@ export function CurrentCursor({ id }: { id: string }) {
     </div>
   );
 }
-

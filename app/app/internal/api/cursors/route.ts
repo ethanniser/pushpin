@@ -21,7 +21,7 @@ async function publishToCursors(message: string) {
   try {
     await publisher.publishFormats(
       CURSOR_CHANNEL,
-      new WebSocketMessageFormat(message)
+      new WebSocketMessageFormat(message),
     );
   } catch (error) {
     console.error(`[Cursors-v2] Error publishing to channel:`, error);
@@ -65,7 +65,7 @@ export async function GET(req: Request): Promise<Response> {
 
       if (data.type === "cursor-update") {
         console.log(
-          `[Cursors-v2] Update from ${data.id}: ${data.positions.length} positions`
+          `[Cursors-v2] Update from ${data.id}: ${data.positions.length} positions`,
         );
         await publishToCursors(message);
       } else if (data.type === "cursor-join") {
