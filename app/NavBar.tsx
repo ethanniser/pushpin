@@ -6,11 +6,6 @@ import { usePathname } from "next/navigation";
 export function NavBar() {
   const pathname = usePathname();
 
-  // Hide navbar on cursors page (full screen)
-  if (pathname === "/cursors") {
-    return null;
-  }
-
   const isActive = (path: string) => {
     return pathname === path
       ? "bg-blue-600 text-white"
