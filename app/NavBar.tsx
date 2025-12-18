@@ -19,15 +19,30 @@ export function NavBar() {
 
   return (
     <nav className="bg-gray-800 shadow-lg w-full flex items-center justify-between px-6 py-4">
-      <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <span className="text-2xl">⚡</span>
-        <span className="text-xl font-bold text-white">Serverless SSE/WS</span>
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <span className="text-2xl">⚡</span>
+          <span className="text-xl font-bold text-white">
+            Serverless SSE/WS Demo
+          </span>
+        </Link>
+        <a
+          href="https://github.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          view the source code!
+        </a>
+      </div>
       <div className="flex gap-4">
         <Link
           href="/"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/",
+            "/"
           )}`}
         >
           Home
@@ -35,7 +50,7 @@ export function NavBar() {
         <Link
           href="/stream"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/stream",
+            "/stream"
           )}`}
         >
           Stream (SSE)
@@ -43,7 +58,7 @@ export function NavBar() {
         <Link
           href="/chat"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/chat",
+            "/chat"
           )}`}
         >
           Chat (WS)
@@ -51,7 +66,7 @@ export function NavBar() {
         <Link
           href="/cursors"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/cursors",
+            "/cursors"
           )}`}
         >
           Cursors
