@@ -11,8 +11,12 @@ export function CurrentCursor({ id }: { id: string }) {
     const handleMouseMove = (event: MouseEvent) => {
       // Directly update DOM for zero-latency cursor movement
       if (cursorRef.current) {
-        cursorRef.current.style.left = `${event.clientX}px`;
-        cursorRef.current.style.top = `${event.clientY}px`;
+        const container = cursorRef.current.parentElement;
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          cursorRef.current.style.left = `${event.clientX - rect.left}px`;
+          cursorRef.current.style.top = `${event.clientY - rect.top}px`;
+        }
       }
     };
 

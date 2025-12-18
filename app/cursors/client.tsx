@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Cursor } from "@/app/components/Cursor";
 import { CurrentCursor } from "@/app/components/CurrentCursor";
 import { generateUsername, type CursorMessage } from "@/app/utils/cursor-utils";
@@ -17,7 +16,7 @@ const BATCHING_TIME = 500; // Batch cursor updates every 500ms
 
 export default function Cursors() {
   const [otherCursors, setOtherCursors] = useState<Record<string, CursorData>>(
-    {},
+    {}
   );
   const [isConnected, setIsConnected] = useState(false);
   const [myId] = useState(() => generateUsername());
@@ -43,7 +42,7 @@ export default function Cursors() {
           JSON.stringify({
             type: "cursor-join",
             id: myId,
-          }),
+          })
         );
         hasJoined.current = true;
       }
@@ -122,7 +121,7 @@ export default function Cursors() {
           JSON.stringify({
             type: "cursor-leave",
             id: myId,
-          }),
+          })
         );
       }
       ws.close();
@@ -145,7 +144,7 @@ export default function Cursors() {
           type: "cursor-update",
           id: myId,
           positions: pendingPositions.current,
-        }),
+        })
       );
 
       pendingPositions.current = [];
@@ -186,20 +185,11 @@ export default function Cursors() {
   };
 
   return (
-    <div
-      className="relative h-screen w-screen cursor-none overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100"
-      onMouseMove={handleMouseMove}
-    >
+    <div className="flex h-[calc(100vh-4rem)] w-screen flex-col overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
-      <div className="absolute left-0 right-0 top-0 z-10 border-b border-slate-200 bg-white/80 p-4 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              ← Back
-            </Link>
+      <div className="border-b border-slate-200 bg-white/80 p-4 backdrop-blur-sm">
+        <div className="flex w-full items-center justify-between">
+          <div className="flex items-center gap-4 px-6">
             <h1 className="text-xl font-bold text-slate-900">Live Cursors</h1>
             <div
               className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${
@@ -216,44 +206,50 @@ export default function Cursors() {
               {isConnected ? "Connected" : "Disconnected"}
             </div>
           </div>
-          <div className="text-sm text-slate-600">
+          <div className="ml-auto px-6 text-sm text-slate-600">
             You are:{" "}
             <span className="font-semibold text-slate-900">@{myId}</span>
           </div>
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-default text-center">
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-8 shadow-xl backdrop-blur-sm">
-          <h2 className="mb-2 text-2xl font-bold text-slate-900">
-            Move your mouse around!
-          </h2>
-          <p className="text-slate-600">
-            Open this page in another tab or browser to see live cursors in
-            action.
-          </p>
-          <div className="mt-4 text-sm text-slate-500">
-            {Object.keys(otherCursors).length > 0 ? (
-              <>
-                👥 {Object.keys(otherCursors).length} other{" "}
-                {Object.keys(otherCursors).length === 1 ? "person" : "people"}{" "}
-                online
-              </>
-            ) : (
-              "No other users online yet"
-            )}
+      {/* Cursor tracking area */}
+      <div
+        className="relative flex-1 cursor-none"
+        onMouseMove={handleMouseMove}
+      >
+        {/* Instructions */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-default text-center">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 p-8 shadow-xl backdrop-blur-sm">
+            <h2 className="mb-2 text-2xl font-bold text-slate-900">
+              Move your mouse around!
+            </h2>
+            <p className="text-slate-600">
+              Open this page in another tab or browser to see live cursors in
+              action.
+            </p>
+            <div className="mt-4 text-sm text-slate-500">
+              {Object.keys(otherCursors).length > 0 ? (
+                <>
+                  👥 {Object.keys(otherCursors).length} other{" "}
+                  {Object.keys(otherCursors).length === 1 ? "person" : "people"}{" "}
+                  online
+                </>
+              ) : (
+                "No other users online yet"
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Render other cursors */}
+        {Object.values(otherCursors).map((cursor) => (
+          <Cursor key={cursor.id} id={cursor.id} x={cursor.x} y={cursor.y} />
+        ))}
+
+        {/* Render current user's cursor */}
+        <CurrentCursor id={myId} />
       </div>
-
-      {/* Render other cursors */}
-      {Object.values(otherCursors).map((cursor) => (
-        <Cursor key={cursor.id} id={cursor.id} x={cursor.x} y={cursor.y} />
-      ))}
-
-      {/* Render current user's cursor */}
-      <CurrentCursor id={myId} />
     </div>
   );
 }
