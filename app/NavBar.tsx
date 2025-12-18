@@ -42,7 +42,7 @@ export function NavBar() {
         <Link
           href="/"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/"
+            "/",
           )}`}
         >
           Home
@@ -50,7 +50,7 @@ export function NavBar() {
         <Link
           href="/stream"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/stream"
+            "/stream",
           )}`}
         >
           Stream (SSE)
@@ -58,7 +58,7 @@ export function NavBar() {
         <Link
           href="/chat"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/chat"
+            "/chat",
           )}`}
         >
           Chat (WS)
@@ -66,7 +66,7 @@ export function NavBar() {
         <Link
           href="/cursors"
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
-            "/cursors"
+            "/cursors",
           )}`}
         >
           Cursors
