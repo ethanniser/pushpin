@@ -6,22 +6,4 @@ services:
     ports:
       - "7999:7999" # HTTP port
       - "5561:5561" # Control port (HTTP)
-    depends_on:
-      - app
-
-  app:
-    build:
-      context: ./app
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - GRIP_URL=http://pushpin:5561/
-      - PUSHPIN_HOST=pushpin
-      - PUSHPIN_PORT=7999
     depends_on: []
-
-networks:
-  default:
-    name: pushpin-network

@@ -27,8 +27,9 @@ export default function Stream() {
     setError(null);
 
     try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
       console.log(`Subscribing to topic: ${topic}`);
-      const eventSource = new EventSource(`/api/subscribe/${topic}`);
+      const eventSource = new EventSource(`${apiBase}/api/subscribe/${topic}`);
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
@@ -85,7 +86,8 @@ export default function Stream() {
       setMessages((prev) => [...prev, outgoingMessage]);
 
       // Publish to the topic
-      await fetch(`/api/publish/${topic}`, {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      await fetch(`${apiBase}/api/publish/${topic}`, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: content,

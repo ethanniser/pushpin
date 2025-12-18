@@ -37,10 +37,8 @@ export default function Chat() {
     setError(null);
 
     try {
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(
-        `${wsProtocol}//${window.location.host}/api/socket`,
-      );
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const ws = new WebSocket(`${apiBase}/api/socket`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -53,7 +51,7 @@ export default function Chat() {
             type: "join",
             room,
             username: username.trim(),
-          }),
+          })
         );
       };
 
@@ -123,7 +121,7 @@ export default function Chat() {
           room,
           username: username.trim(),
           message: message.trim(),
-        }),
+        })
       );
       setMessage("");
     } catch (err) {
@@ -235,8 +233,8 @@ export default function Chat() {
                             msg.username === "System"
                               ? "bg-gray-200 text-gray-600 text-center w-full"
                               : msg.isOwn
-                                ? "bg-green-500 text-white"
-                                : "bg-white border border-gray-300 text-gray-800"
+                              ? "bg-green-500 text-white"
+                              : "bg-white border border-gray-300 text-gray-800"
                           }`}
                         >
                           <div className="text-xs font-semibold mb-1 opacity-75">

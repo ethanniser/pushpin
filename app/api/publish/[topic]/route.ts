@@ -6,12 +6,12 @@ import { NextRequest } from "next/server";
 
 // Initialize GRIP publisher
 const publisher = new Publisher({
-  control_uri: process.env.GRIP_URL || "http://pushpin:5561/",
+  control_uri: process.env.PUBLISH_URL || "http://pushpin:5561/",
 });
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ topic: string }> },
+  { params }: { params: Promise<{ topic: string }> }
 ): Promise<Response> {
   const { topic } = await params;
 
@@ -50,7 +50,7 @@ export async function POST(
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      },
+      }
     );
   } catch (error) {
     console.error("[Publish-v2 ERROR]", error);
@@ -65,7 +65,7 @@ export async function POST(
           "Content-Type": "application/json",
           ...corsHeaders,
         },
-      },
+      }
     );
   }
 }

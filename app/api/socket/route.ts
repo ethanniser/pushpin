@@ -11,7 +11,7 @@ import {
 
 // Initialize GRIP publisher
 const publisher = new Publisher({
-  control_uri: process.env.GRIP_URL || "http://pushpin:5561/",
+  control_uri: process.env.PUBLISH_URL || "http://pushpin:5561/",
 });
 
 // Publish a message to a Pushpin channel via GRIP
@@ -19,7 +19,7 @@ async function publishToChannel(channel: string, message: string) {
   try {
     await publisher.publishFormats(
       channel,
-      new WebSocketMessageFormat(message),
+      new WebSocketMessageFormat(message)
     );
   } catch (error) {
     console.error(`[Socket-v2] Error publishing to channel ${channel}:`, error);
@@ -62,7 +62,7 @@ export async function GET(req: Request): Promise<Response> {
           JSON.stringify({
             type: "system",
             message: `${username} has left the room`,
-          }),
+          })
         );
       }
 
@@ -94,7 +94,7 @@ export async function GET(req: Request): Promise<Response> {
           JSON.stringify({
             type: "system",
             message: `${username} joined the room`,
-          }),
+          })
         );
 
         // Send welcome message to user
@@ -102,7 +102,7 @@ export async function GET(req: Request): Promise<Response> {
           JSON.stringify({
             type: "system",
             message: `Welcome to #${room}!`,
-          }),
+          })
         );
       } else if (data.type === "message") {
         const room = wsContext.meta?.["Room"] || data.room || "general";
@@ -118,7 +118,7 @@ export async function GET(req: Request): Promise<Response> {
             type: "message",
             username,
             message: messageText,
-          }),
+          })
         );
       } else {
         console.log(`[Socket-v2] Unknown message type:`, data.type);
