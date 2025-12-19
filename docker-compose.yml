@@ -6,16 +6,3 @@ services:
     ports:
       - "7999:7999" # HTTP port
       - "5561:5561" # Control port (HTTP)
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-
-volumes:
-  redis-data:
