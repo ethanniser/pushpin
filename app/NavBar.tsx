@@ -66,6 +66,14 @@ export function NavBar() {
         >
           Cursors
         </Link>
+        <Link
+          href="/yjs"
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive(
+            "/yjs",
+          )}`}
+        >
+          Yjs Editor
+        </Link>
       </div>
     </nav>
   );
