@@ -15,6 +15,7 @@ import * as decoding from "lib0/decoding";
 // Message types (from y-protocols)
 const messageSync = 0;
 const messageAwareness = 1;
+const messageQueryAwareness = 3;
 
 // Sync message sub-types (from y-protocols/sync)
 const messageYjsSyncStep1 = 0;
@@ -100,6 +101,13 @@ function encodeSyncStep2(update: Uint8Array): Uint8Array {
   return encoding.toUint8Array(encoder);
 }
 
+// Encode a QueryAwareness message (ask "who's here?")
+function encodeQueryAwareness(): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageQueryAwareness);
+  return encoding.toUint8Array(encoder);
+}
+
 /**
  * Creates a WebSocket-over-HTTP request handler for Yjs
  *
@@ -157,6 +165,10 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
           console.error(`[Yjs] Error loading persisted state:`, error);
         }
       }
+
+      // Broadcast QueryAwareness to get existing clients to announce themselves
+      // Other clients will respond with their awareness state
+      await publishToChannel(publisher, channel, encodeQueryAwareness());
     }
 
     // Process incoming messages
@@ -217,6 +229,9 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
           }
         } else if (messageType === messageAwareness) {
           // Awareness update - just broadcast, don't persist
+          await publishToChannel(publisher, channel, message);
+        } else if (messageType === messageQueryAwareness) {
+          // Query awareness - broadcast so other clients respond with their state
           await publishToChannel(publisher, channel, message);
         }
       } catch (error) {
