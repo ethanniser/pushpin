@@ -1,6 +1,6 @@
 // WebSocket-over-HTTP handler factory for Yjs collaborative editing
-// Stateless relay - similar to y-websocket-server but serverless
-// Just relays messages between clients via GRIP pub/sub
+// Stateless relay - Y.Doc-free serverless implementation
+// Persistence is treated as "just another peer" - stores/retrieves raw updates
 
 import {
   Publisher,
@@ -9,47 +9,47 @@ import {
   getWebSocketContextFromReq,
   encodeWebSocketEvents,
 } from "@fanoutio/grip";
-import * as Y from "yjs";
-import * as syncProtocol from "y-protocols/sync";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 
-// Message types
+// Message types (from y-protocols)
 const messageSync = 0;
 const messageAwareness = 1;
 
+// Sync message sub-types (from y-protocols/sync)
+const messageYjsSyncStep1 = 0;
+const messageYjsSyncStep2 = 1;
+const messageYjsUpdate = 2;
+
+// Empty state vector - tells client "I have nothing, send me everything"
+// This is Y.encodeStateVector(new Y.Doc()) which encodes an empty map as [0]
+const emptyStateVector = new Uint8Array([0]);
+
 /**
- * Persistence provider interface (similar to y-websocket-server)
+ * Persistence provider interface - treats persistence as "just another peer"
  *
- * In serverless context:
- * - bindState is called on connection OPEN to load existing doc state
- * - writeState is called on each update to persist changes
+ * Think of it like a peer that:
+ * - Can receive updates (storeUpdate)
+ * - Can provide its current state (getState)
  */
 export interface PersistenceProvider {
   /**
-   * Called when a client connects to load existing document state
-   * Should apply any persisted state to the provided Y.Doc
+   * Get the current document state as a Yjs update
+   * Returns the full merged state, or null if no state exists
+   * The provider handles merging internally (e.g., snapshot + pending updates)
    */
-  bindState(docName: string, doc: Y.Doc): Promise<void>;
+  getState(docName: string): Promise<Uint8Array | null>;
 
   /**
-   * Called when an update is received to persist it
-   * @param docName - The document name/room
-   * @param doc - The Y.Doc (may be empty in stateless mode - update is more useful)
-   * @param update - The raw Yjs update bytes
+   * Store an update (like receiving an update from a peer)
+   * The provider handles merging/compaction internally
    */
-  writeState(docName: string, doc: Y.Doc, update: Uint8Array): Promise<void>;
+  storeUpdate(docName: string, update: Uint8Array): Promise<void>;
 }
 
 export type YjsHandlerOptions = {
   /** GRIP publisher control URI */
   publishUrl?: string;
-
-  /**
-   * Function to extract room/doc name from request URL (like y-websocket-server)
-   * Default: takes last path segment, e.g., /api/yjs/my-room -> "my-room"
-   */
-  getDocName?: (req: Request) => string;
 
   /**
    * Optional persistence provider for loading/saving document state
@@ -58,12 +58,10 @@ export type YjsHandlerOptions = {
   persistence?: PersistenceProvider;
 };
 
-// Default: extract room from URL path after base route
+// Extract room from URL path after base route
 // e.g., ws://host/api/yjs/my-room -> "my-room"
-// e.g., ws://host/api/yjs/my-room?token=abc -> "my-room"
-function defaultGetDocName(req: Request): string {
+function getDocName(req: Request): string {
   const url = new URL(req.url);
-  // Get the last segment of the path
   const segments = url.pathname.split("/").filter(Boolean);
   return segments[segments.length - 1] || "default";
 }
@@ -75,27 +73,56 @@ async function publishToChannel(
   message: Uint8Array
 ) {
   try {
-    await publisher.publishFormats(channel, new WebSocketMessageFormat(message));
+    await publisher.publishFormats(
+      channel,
+      new WebSocketMessageFormat(message)
+    );
   } catch (error) {
     console.error(`[Yjs] Error publishing to channel ${channel}:`, error);
   }
 }
 
+// Encode a SyncStep1 message (request state from peer)
+function encodeSyncStep1(stateVector: Uint8Array): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageSync);
+  encoding.writeVarUint(encoder, messageYjsSyncStep1);
+  encoding.writeVarUint8Array(encoder, stateVector);
+  return encoding.toUint8Array(encoder);
+}
+
+// Encode a SyncStep2 message (send state to peer)
+function encodeSyncStep2(update: Uint8Array): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageSync);
+  encoding.writeVarUint(encoder, messageYjsSyncStep2);
+  encoding.writeVarUint8Array(encoder, update);
+  return encoding.toUint8Array(encoder);
+}
+
 /**
  * Creates a WebSocket-over-HTTP request handler for Yjs
- * Similar to y-websocket-server's setupWSConnection but for serverless
+ *
+ * This is a Y.Doc-free implementation - the server never creates a Y.Doc.
+ * Instead, it treats persistence as another peer and just relays raw updates.
+ *
+ * Protocol flow:
+ * 1. Client connects, sends SyncStep1 (its state vector)
+ * 2. Server responds with SyncStep2 (full state from persistence)
+ * 3. Server sends SyncStep1 with empty state vector (requests client's full state)
+ * 4. Client responds with SyncStep2 (its full state)
+ * 5. Server persists client's state
+ * 6. Ongoing: Updates are persisted and broadcast
  */
 export function makeYjsHandler(options: YjsHandlerOptions = {}) {
   const {
     publishUrl = process.env.PUBLISH_URL || "http://pushpin:5561/",
-    getDocName = defaultGetDocName,
     persistence,
   } = options;
 
   const publisher = new Publisher({ control_uri: publishUrl });
 
   return async function handler(req: Request): Promise<Response> {
-    // Verify this is a WebSocket-over-HTTP request
     if (!isWsOverHttp(req)) {
       return new Response("Not a WebSocket-over-HTTP request", { status: 400 });
     }
@@ -105,39 +132,30 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
     const docName = getDocName(req);
     const channel = `yjs:${docName}`;
 
-    console.log(`[Yjs] Request for doc "${docName}" from: ${connectionId}`);
-
     // Handle connection opening
     if (wsContext.isOpening()) {
       console.log(`[Yjs] Connection opened: ${connectionId}`);
       wsContext.accept();
       wsContext.subscribe(channel);
 
-      // Create doc and optionally load persisted state
-      const doc = new Y.Doc();
+      // Send SyncStep1 with empty state vector
+      // This tells the client "I have nothing, send me everything"
+      // Client will respond with SyncStep2 containing its full state
+      wsContext.sendBinary(Buffer.from(encodeSyncStep1(emptyStateVector)));
 
+      // If we have persisted state, send it as SyncStep2
       if (persistence) {
         try {
-          await persistence.bindState(docName, doc);
-          console.log(`[Yjs] Loaded persisted state for "${docName}"`);
+          const state = await persistence.getState(docName);
+          if (state && state.length > 0) {
+            console.log(
+              `[Yjs] Sending persisted state for "${docName}" (${state.length} bytes)`
+            );
+            wsContext.sendBinary(Buffer.from(encodeSyncStep2(state)));
+          }
         } catch (error) {
           console.error(`[Yjs] Error loading persisted state:`, error);
         }
-      }
-
-      // Send sync step 1 (our state vector)
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, messageSync);
-      syncProtocol.writeSyncStep1(encoder, doc);
-      wsContext.sendBinary(Buffer.from(encoding.toUint8Array(encoder)));
-
-      // If we have persisted state, also send sync step 2 with full state
-      if (persistence && doc.store.clients.size > 0) {
-        const encoder2 = encoding.createEncoder();
-        encoding.writeVarUint(encoder2, messageSync);
-        encoding.writeVarUint(encoder2, syncProtocol.messageYjsSyncStep2);
-        encoding.writeVarUint8Array(encoder2, Y.encodeStateAsUpdate(doc));
-        wsContext.sendBinary(Buffer.from(encoding.toUint8Array(encoder2)));
       }
     }
 
@@ -146,13 +164,11 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
       const rawMessage = wsContext.recvRaw();
 
       if (rawMessage === null) {
-        // CLOSE message
         console.log(`[Yjs] Connection closed: ${connectionId}`);
         wsContext.close();
         break;
       }
 
-      // Get message bytes
       const message =
         typeof rawMessage === "string"
           ? new TextEncoder().encode(rawMessage)
@@ -165,41 +181,32 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
         if (messageType === messageSync) {
           const syncType = decoding.readVarUint(decoder);
 
-          if (syncType === syncProtocol.messageYjsSyncStep1) {
+          if (syncType === messageYjsSyncStep1) {
             // Client is asking for our state
-            const clientStateVector = decoding.readVarUint8Array(decoder);
+            // We ignore their state vector and just send full state
+            // (CRDTs handle deduplication gracefully)
+            decoding.readVarUint8Array(decoder); // consume but ignore state vector
 
-            // Create doc and load persisted state if available
-            const doc = new Y.Doc();
             if (persistence) {
               try {
-                await persistence.bindState(docName, doc);
+                const state = await persistence.getState(docName);
+                if (state && state.length > 0) {
+                  wsContext.sendBinary(Buffer.from(encodeSyncStep2(state)));
+                }
               } catch (error) {
                 console.error(`[Yjs] Error loading state for sync:`, error);
               }
             }
-
-            // Send sync step 2 with what they're missing
-            const encoder = encoding.createEncoder();
-            encoding.writeVarUint(encoder, messageSync);
-            syncProtocol.writeSyncStep2(encoder, doc, clientStateVector);
-            const response = encoding.toUint8Array(encoder);
-            if (response.length > 1) {
-              wsContext.sendBinary(Buffer.from(response));
-            }
           } else if (
-            syncType === syncProtocol.messageYjsSyncStep2 ||
-            syncType === syncProtocol.messageYjsUpdate
+            syncType === messageYjsSyncStep2 ||
+            syncType === messageYjsUpdate
           ) {
-            // Client sending state or update
+            // Client sending state or update - persist and broadcast
             const update = decoding.readVarUint8Array(decoder);
 
-            // Persist the update if persistence is configured
-            if (persistence) {
+            if (persistence && update.length > 0) {
               try {
-                const doc = new Y.Doc();
-                Y.applyUpdate(doc, update);
-                await persistence.writeState(docName, doc, update);
+                await persistence.storeUpdate(docName, update);
               } catch (error) {
                 console.error(`[Yjs] Error persisting update:`, error);
               }

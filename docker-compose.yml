@@ -6,3 +6,8 @@ services:
     ports:
       - "7999:7999" # HTTP port
       - "5561:5561" # Control port (HTTP)
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
