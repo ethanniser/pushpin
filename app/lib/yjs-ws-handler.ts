@@ -12,15 +12,23 @@ import {
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 
-// Message types (from y-protocols)
-const messageSync = 0;
-const messageAwareness = 1;
-const messageQueryAwareness = 3;
+// Outer message types (transport layer) from y-websocket
+import {
+  messageSync,
+  messageAwareness,
+  messageAuth,
+  messageQueryAwareness,
+} from "y-websocket";
 
-// Sync message sub-types (from y-protocols/sync)
-const messageYjsSyncStep1 = 0;
-const messageYjsSyncStep2 = 1;
-const messageYjsUpdate = 2;
+// Sync sub-message types from y-protocols
+import {
+  messageYjsSyncStep1,
+  messageYjsSyncStep2,
+  messageYjsUpdate,
+} from "y-protocols/sync";
+
+// Auth sub-message types from y-protocols
+import { messagePermissionDenied } from "y-protocols/auth";
 
 // Empty state vector - tells client "I have nothing, send me everything"
 // This is Y.encodeStateVector(new Y.Doc()) which encodes an empty map as [0]
@@ -105,6 +113,16 @@ function encodeSyncStep2(update: Uint8Array): Uint8Array {
 function encodeQueryAwareness(): Uint8Array {
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageQueryAwareness);
+  return encoding.toUint8Array(encoder);
+}
+
+// Encode a PermissionDenied message (for auth errors)
+// Exported for use in custom auth implementations
+function encodePermissionDenied(reason: string): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, messageAuth);
+  encoding.writeVarUint(encoder, messagePermissionDenied);
+  encoding.writeVarString(encoder, reason);
   return encoding.toUint8Array(encoder);
 }
 
