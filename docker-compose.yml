@@ -12,9 +12,9 @@ services:
     ports:
       - "6379:6379"
 
-  nginx:
+  caddy:
     build:
-      context: ./nginx
+      context: ./caddy
       dockerfile: Dockerfile.development
     ports:
       - "8882:8882"

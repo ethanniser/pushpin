@@ -1,0 +1,4 @@
+:8882 {
+	reverse_proxy {$PROXY_TARGET}
+}
+
