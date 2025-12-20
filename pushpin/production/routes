@@ -1,2 +1,2 @@
-*,proto=ws stateless-sockets-demo.vercel.app,over_http
-*,proto=http stateless-sockets-demo.vercel.app
+*,proto=ws stateless-sockets-demo.vercel.app:443,over_http
+*,proto=http stateless-sockets-demo.vercel.app:443
