@@ -5,13 +5,18 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { generateUsername, getUserColor } from "@/app/utils/cursor-utils";
 
+// Quill must be loaded client-side only (no SSR)
+import type Quill from "quill";
+import type { QuillBinding } from "y-quill";
+
 type AwarenessState = {
   user: {
     name: string;
     color: string;
   };
   cursor?: {
-    index: number;
+    anchor: unknown;
+    head: unknown;
   };
 };
 
@@ -19,115 +24,148 @@ export default function YjsEditor() {
   const [status, setStatus] = useState<
     "connecting" | "connected" | "disconnected"
   >("disconnected");
-  const [text, setText] = useState("");
   const [users, setUsers] = useState<Map<number, AwarenessState>>(new Map());
   const [myId] = useState(() => generateUsername());
   const [roomName, setRoomName] = useState("default");
   const [isJoined, setIsJoined] = useState(false);
+  const [quillLoaded, setQuillLoaded] = useState(false);
 
   const docRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
-  const yTextRef = useRef<Y.Text | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isLocalChange = useRef(false);
+  const quillRef = useRef<Quill | null>(null);
+  const bindingRef = useRef<QuillBinding | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load Quill client-side only
+  useEffect(() => {
+    const loadQuill = async () => {
+      // Dynamically import Quill and its dependencies
+      const QuillModule = (await import("quill")).default;
+      const QuillCursors = (await import("quill-cursors")).default;
+
+      // Register cursors module
+      QuillModule.register("modules/cursors", QuillCursors);
+
+      setQuillLoaded(true);
+    };
+
+    loadQuill();
+  }, []);
 
   const joinRoom = useCallback(() => {
-    if (!roomName.trim()) return;
+    if (!roomName.trim() || !quillLoaded) return;
+    setIsJoined(true);
+  }, [roomName, quillLoaded]);
 
-    // Clean up existing provider
-    if (providerRef.current) {
-      providerRef.current.destroy();
-    }
+  // Initialize Quill after joining (when the container is mounted)
+  useEffect(() => {
+    if (!isJoined || !quillLoaded || !editorContainerRef.current) return;
 
-    // Create new Y.Doc
-    const doc = new Y.Doc();
-    docRef.current = doc;
+    let cancelled = false;
 
-    // Get the shared text type
-    const yText = doc.getText("content");
-    yTextRef.current = yText;
+    const initEditor = async () => {
+      // Clean up existing provider and binding
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
+      }
+      if (providerRef.current) {
+        providerRef.current.destroy();
+        providerRef.current = null;
+      }
+      if (quillRef.current) {
+        quillRef.current = null;
+      }
 
-    // Create provider using standard y-websocket
-    // URL format: ws://host/api/yjs/{room}
-    // y-websocket constructs: serverUrl + "/" + roomname
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-    // const apiBase = "http://localhost:1234";
-    const wsUrl = apiBase.replace(/^http/, "ws") + "/api/yjs";
+      if (cancelled || !editorContainerRef.current) return;
 
-    const provider = new WebsocketProvider(wsUrl, roomName, doc);
-    providerRef.current = provider;
+      // Clear the editor container
+      editorContainerRef.current.innerHTML = "";
 
-    // Set awareness state
-    const myColor = getUserColor(myId);
-    provider.awareness.setLocalState({
-      user: {
+      // Dynamically import Quill
+      const QuillModule = (await import("quill")).default;
+      const { QuillBinding } = await import("y-quill");
+
+      if (cancelled || !editorContainerRef.current) return;
+
+      // Create new Y.Doc
+      const doc = new Y.Doc();
+      docRef.current = doc;
+
+      // Get the shared text type
+      const yText = doc.getText("quill");
+
+      // Create Quill editor
+      const editor = new QuillModule(editorContainerRef.current, {
+        modules: {
+          cursors: true,
+          toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["blockquote", "code-block"],
+            ["link"],
+            ["clean"],
+          ],
+          history: {
+            userOnly: true,
+          },
+        },
+        placeholder: "Start collaborating...",
+        theme: "snow",
+      });
+      quillRef.current = editor;
+
+      // Create provider using standard y-websocket
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const wsUrl = apiBase.replace(/^http/, "ws") + "/api/yjs";
+
+      const provider = new WebsocketProvider(wsUrl, roomName, doc);
+      providerRef.current = provider;
+
+      // Set awareness state with user info
+      const myColor = getUserColor(myId);
+      provider.awareness.setLocalStateField("user", {
         name: myId,
         color: myColor,
-      },
-    } as AwarenessState);
-
-    // Listen to connection status
-    provider.on("status", (event: { status: string }) => {
-      setStatus(event.status as "connecting" | "connected" | "disconnected");
-    });
-
-    // Listen to awareness changes
-    const updateUsers = () => {
-      const states = new Map<number, AwarenessState>();
-      provider.awareness.getStates().forEach((state, clientId) => {
-        if (state && (state as AwarenessState).user) {
-          states.set(clientId, state as AwarenessState);
-        }
       });
-      setUsers(states);
-    };
-    provider.awareness.on("change", updateUsers);
-    updateUsers();
 
-    // Listen to text changes
-    const updateText = () => {
-      if (!isLocalChange.current) {
-        setText(yText.toString());
-      }
-    };
-    yText.observe(updateText);
-    updateText();
+      // Create binding between Y.Text and Quill
+      const binding = new QuillBinding(yText, editor, provider.awareness);
+      bindingRef.current = binding;
 
-    setIsJoined(true);
-  }, [roomName, myId]);
-
-  // Handle local text input
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (!yTextRef.current || !docRef.current) return;
-
-    const newValue = e.target.value;
-    const yText = yTextRef.current;
-
-    // Mark as local change to prevent feedback loop
-    isLocalChange.current = true;
-
-    // Simple diff: delete all and insert new
-    // In production, you'd want a proper diff algorithm
-    docRef.current.transact(() => {
-      yText.delete(0, yText.length);
-      yText.insert(0, newValue);
-    });
-
-    setText(newValue);
-    isLocalChange.current = false;
-
-    // Update cursor position in awareness
-    if (providerRef.current) {
-      const selectionStart = e.target.selectionStart;
-      providerRef.current.awareness.setLocalStateField("cursor", {
-        index: selectionStart,
+      // Listen to connection status
+      provider.on("status", (event: { status: string }) => {
+        setStatus(event.status as "connecting" | "connected" | "disconnected");
       });
-    }
-  };
+
+      // Listen to awareness changes
+      const updateUsers = () => {
+        const states = new Map<number, AwarenessState>();
+        provider.awareness.getStates().forEach((state, clientId) => {
+          if (state && (state as AwarenessState).user) {
+            states.set(clientId, state as AwarenessState);
+          }
+        });
+        setUsers(states);
+      };
+      provider.awareness.on("change", updateUsers);
+      updateUsers();
+    };
+
+    initEditor();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isJoined, quillLoaded, roomName, myId]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+      }
       if (providerRef.current) {
         providerRef.current.destroy();
       }
@@ -166,9 +204,10 @@ export default function YjsEditor() {
             </div>
             <button
               onClick={joinRoom}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700"
+              disabled={!quillLoaded}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:bg-gray-400"
             >
-              Join Room
+              {quillLoaded ? "Join Room" : "Loading editor..."}
             </button>
           </div>
         </div>
@@ -178,6 +217,45 @@ export default function YjsEditor() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-screen flex-col bg-linear-to-br from-slate-50 to-slate-100">
+      {/* Quill CSS */}
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css"
+      />
+      <style>{`
+        .ql-container {
+          font-size: 16px;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        .ql-editor {
+          min-height: 300px;
+        }
+        /* Remote cursor styles */
+        .ql-cursor-caret-container {
+          position: absolute;
+          height: 100%;
+        }
+        .ql-cursor-caret {
+          position: absolute;
+          height: 100%;
+          width: 2px;
+        }
+        .ql-cursor-flag {
+          position: absolute;
+          top: -1.5em;
+          left: 0;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-size: 12px;
+          white-space: nowrap;
+          color: white;
+        }
+        .ql-cursor-selection {
+          position: absolute;
+          opacity: 0.3;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="border-b border-slate-200 bg-white/80 p-4 backdrop-blur-sm">
         <div className="flex w-full items-center justify-between">
@@ -241,11 +319,15 @@ export default function YjsEditor() {
             </div>
             <button
               onClick={() => {
+                if (bindingRef.current) {
+                  bindingRef.current.destroy();
+                  bindingRef.current = null;
+                }
                 if (providerRef.current) {
                   providerRef.current.destroy();
+                  providerRef.current = null;
                 }
                 setIsJoined(false);
-                setText("");
               }}
               className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-100"
             >
@@ -256,26 +338,18 @@ export default function YjsEditor() {
       </div>
 
       {/* Editor */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="mx-auto h-full max-w-4xl">
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleTextChange}
-            placeholder="Start typing... Changes sync in real-time with other users."
-            className="h-full w-full resize-none rounded-xl border border-slate-200 bg-white p-6 text-lg text-slate-900 shadow-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            style={{ fontFamily: "ui-monospace, monospace" }}
-          />
+          <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+            <div ref={editorContainerRef} />
+          </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className="border-t border-slate-200 bg-white/80 px-6 py-3 backdrop-blur-sm">
         <div className="flex items-center justify-between text-sm text-slate-500">
-          <div>
-            {text.length} characters •{" "}
-            {text.split(/\s+/).filter(Boolean).length} words
-          </div>
+          <div>Rich text collaborative editing with real-time cursors</div>
           <div>
             Powered by{" "}
             <a
@@ -285,6 +359,15 @@ export default function YjsEditor() {
               className="text-blue-600 hover:underline"
             >
               Yjs
+            </a>{" "}
+            +{" "}
+            <a
+              href="https://quilljs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Quill
             </a>{" "}
             +{" "}
             <a
