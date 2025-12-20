@@ -4,10 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { generateUsername, getUserColor } from "@/app/utils/cursor-utils";
-
-// Quill must be loaded client-side only (no SSR)
-import type Quill from "quill";
-import type { QuillBinding } from "y-quill";
+import Quill from "quill";
+import { QuillBinding } from "y-quill";
 
 type AwarenessState = {
   user: {
@@ -82,10 +80,6 @@ export default function YjsEditor() {
       // Clear the editor container
       editorContainerRef.current.innerHTML = "";
 
-      // Dynamically import Quill
-      const QuillModule = (await import("quill")).default;
-      const { QuillBinding } = await import("y-quill");
-
       if (cancelled || !editorContainerRef.current) return;
 
       // Create new Y.Doc
@@ -96,7 +90,7 @@ export default function YjsEditor() {
       const yText = doc.getText("quill");
 
       // Create Quill editor
-      const editor = new QuillModule(editorContainerRef.current, {
+      const editor = new Quill(editorContainerRef.current, {
         modules: {
           cursors: true,
           toolbar: [
