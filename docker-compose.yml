@@ -19,4 +19,4 @@ services:
     ports:
       - "8882:8882"
     environment:
-      - PROXY_TARGET=${PROXY_TARGET:-pushpin:5561}
+      - PROXY_TARGET=pushpin:5561
