@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { generateUsername, getUserColor } from "@/app/utils/cursor-utils";
 import Quill from "quill";
+import QuillCursors from "quill-cursors";
 import { QuillBinding } from "y-quill";
 
 type AwarenessState = {
@@ -37,12 +38,8 @@ export default function YjsEditor() {
   // Load Quill client-side only
   useEffect(() => {
     const loadQuill = async () => {
-      // Dynamically import Quill and its dependencies
-      const QuillModule = (await import("quill")).default;
-      const QuillCursors = (await import("quill-cursors")).default;
-
       // Register cursors module
-      QuillModule.register("modules/cursors", QuillCursors);
+      Quill.register("modules/cursors", QuillCursors);
 
       setQuillLoaded(true);
     };

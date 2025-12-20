@@ -227,7 +227,7 @@ export function makeYjsHandler(options: YjsHandlerOptions = {}) {
     }
 
     const wsContext = await getWebSocketContextFromReq(req);
-    const connectionId = req.headers.get("Connection-Id") || "unknown";
+    const connectionId = wsContext.id;
     const docName = getDocName(req);
     const channel = `yjs:${docName}`;
 
